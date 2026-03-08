@@ -33,16 +33,17 @@ Each of these three sections is not a single flat file. Each one is itself built
 - [Examples 💡](#examples)
 - [Color Customization 🎨](#color-customization)
 - [Extending the Config 🔧](#extending-the-config)
+- [Limitations ⚠️](#limitations)
 
 ---
 
-## Requirements
+## ⚙️ Requirements
 
 - Python 3.10 or later
 
 ---
 
-## Installation
+## 🚀 Installation
 
 1. Copy `orcahunter.py` and `orcahunter_config.json` to the same directory.
 2. Make it executable (Linux/macOS):
@@ -58,7 +59,7 @@ Both files must always remain in the same directory. `orcahunter` locates its co
 
 ---
 
-## How OrcaSlicer Profiles Work
+## 🖨️ How OrcaSlicer Profiles Work
 
 OrcaSlicer profiles are organized into three **sections**, each stored as a JSON file:
 
@@ -83,7 +84,7 @@ A setting defined in `My Printer.json` overrides the same setting in any ancesto
 
 ---
 
-## How orcahunter Works
+## 🔍 How orcahunter Works
 
 ### Inheritance Resolution
 
@@ -141,17 +142,18 @@ The full list of known override keys and their targets is maintained in `orcahun
 
 Each setting in the output is classified at display time:
 
-| Flag                 | Meaning                                                                                      |
-|----------------------|----------------------------------------------------------------------------------------------|
-| **Section override** | A higher-priority section set a different value than a lower-priority one                    |
-| **Filament prefix**  | A `filament_xxx` key overrode its base key in machine or process with a different value      |
-| **Inherit override** | The value changed within the winning section's own inheritance chain (only shown with `--show-inheritance`) |
+| Flag                 | Marker | Meaning                                                                                      |
+|----------------------|--------|----------------------------------------------------------------------------------------------|
+| **Section override** | `(*)`  | A higher-priority section set a different value than a lower-priority one                    |
+| **Filament prefix**  | `(*)`  | A `filament_xxx` key overrode its base key in machine or process with a different value      |
+| **Inherit override** | `(*)`  | The value changed within the winning section's own inheritance chain (only shown with `--show-inheritance`) |
+| **No base found**    | `(?)`  | A `filament_xxx` override key is set, but the corresponding base key does not appear in any inherited file — the value is real but cannot be confirmed as an override from the files alone |
 
-Settings with any override are marked with `(*)` in the Effective Values listing.
+Settings with a confirmed override are marked `(*)`. Settings where a filament override key is present but no base value exists to compare against are marked `(?)`.
 
 ---
 
-## Configuration File
+## 🗂️ Configuration File
 
 `orcahunter_config.json` must live alongside `orcahunter.py`. It controls output colors, structural key filtering, and filament override resolution.
 
@@ -236,7 +238,7 @@ The config JSON can be edited by the end user to add or change overrides. This s
 
 ---
 
-## Usage
+## 💻 Usage
 
 ```
 orcahunter.py [-h] [-b FILE] [--base-machine FILE] [--base-filament FILE]
@@ -374,7 +376,7 @@ Omitted diff roles automatically fall back to the corresponding baseline profile
 
 ---
 
-## Output Format
+## 📄 Output Format
 
 ### Single Profile Mode
 
@@ -515,7 +517,7 @@ Diff mode is triggered whenever any `-d` / `--diff-*` flag is provided. Output s
 
 ---
 
-## Examples
+## 💡 Examples
 
 ### View the full effective settings for a printer/filament/process combination
 
@@ -779,7 +781,7 @@ python orcahunter.py ^
 
 ---
 
-## Color Customization
+## 🎨 Color Customization
 
 Output colors are configured in the `colors` block of `orcahunter_config.json` — no code editing required:
 
@@ -819,7 +821,7 @@ Color output is automatically disabled when writing to a file (`--output`) or wh
 
 ---
 
-## Extending the Config
+## 🔧 Extending the Config
 
 ### Adding new filament override keys
 
@@ -861,3 +863,26 @@ If OrcaSlicer adds new structural/administrative keys that should not appear in 
 ### Config versioning
 
 The `"version"` field in `orcahunter_config.json` allows the script to detect incompatible config files. If you make breaking changes to the config structure, increment the version and update `CONFIG_MIN_VERSION` in `orcahunter.py` accordingly.
+
+---
+
+## ⚠️ Limitations
+
+### Settings with no inherited baseline
+
+`orcahunter` determines whether a setting is overridden by comparing values across the resolved inheritance chain. A `filament_` override key can only be confirmed as an override if the corresponding base key also appears somewhere in the chain to compare against.
+
+If you set a filament override key in your profile — for example `filament_ironing_inset` — but none of the ancestor files define the corresponding base key (`ironing_inset`), `orcahunter` has nothing to compare against. The base value OrcaSlicer uses in this case is a compiled-in internal default that is never written to any profile JSON file. Since `orcahunter` only reads JSON files, it cannot know what that default is.
+
+Rather than silently presenting the value as unoverridden, `orcahunter` marks it with `(?)` to indicate that a filament override key is present but no base was found. The value is real and will be used by OrcaSlicer — the `(?)` signals that the override relationship cannot be fully verified from the files alone. These settings appear in their own subsection of the Override Detail output and are counted separately under `No base found (?)` in the Counts.
+
+**Example:** Setting `filament_ironing_inset` in a filament profile when no ancestor defines `ironing_inset`:
+
+```
+  ironing_flow: [16%]  (*)     ← confirmed override, ancestor had a different value
+  ironing_inset: [2]   (?)     ← filament override key set, but no base key found to compare
+  ironing_spacing: [0.2]  (*)  ← confirmed override
+  ironing_speed: [14]  (*)     ← confirmed override
+```
+
+The most common cause is a setting that was added to OrcaSlicer after the vendor base profiles were last updated, or a setting that the vendor simply never explicitly defined (relying on OrcaSlicer's compiled default instead).
