@@ -24,8 +24,8 @@ Each of these three sections is not a single flat file. Each one is itself built
   - [Override Flags](#override-flags)
 - [Configuration File 🗂️](#configuration-file)
 - [Usage 💻](#usage)
-  - [Specifying Profiles](#specifying-profiles)
   - [Specifying Search Directories](#specifying-search-directories)
+  - [Specifying Profiles](#specifying-profiles)
   - [All Options](#all-options)
 - [Output Format 📄](#output-format)
   - [Single Profile Mode](#single-profile-mode)
@@ -153,7 +153,27 @@ Settings with any override are marked with `(*)` in the Effective Values listing
 
 ## Configuration File
 
-`orcahunter_config.json` must live alongside `orcahunter.py`. It controls two things:
+`orcahunter_config.json` must live alongside `orcahunter.py`. It controls output colors, structural key filtering, and filament override resolution.
+
+### `colors`
+
+Optional. Sets the color for each output role. If omitted entirely, built-in defaults are used. See [Color Customization](#color-customization) for the full role reference and valid color names.
+
+```json
+"colors": {
+    "key":          "bright_white",
+    "value":        "cyan",
+    "marker":       "bright_yellow",
+    "machine":      "blue",
+    "filament":     "green",
+    "process":      "yellow",
+    "source":       "dim",
+    "header":       "bold",
+    "winner":       "bright_cyan",
+    "loser":        "red",
+    "diff_changed": "bright_yellow"
+}
+```
 
 ### `meta_keys`
 
@@ -227,46 +247,89 @@ orcahunter.py [-h] [-b FILE] [--base-machine FILE] [--base-filament FILE]
               [--output FILE] [--ignore-missing]
 ```
 
+### Specifying Search Directories
+
+Search directories are the foundation of how `orcahunter` locates files. They serve two purposes:
+
+1. **Finding the profile files you specify** with `-b` and `-d` — you can pass just a filename rather than a full path, and `orcahunter` will find it within your search directories.
+2. **Resolving inherited parent files** — as `orcahunter` walks each inheritance chain, it uses the search directories to locate every ancestor file.
+
+Point your search directories at the root of your OrcaSlicer data — `orcahunter` searches recursively, so a single path covering both `system` and `user` profiles is usually sufficient.
+
+**Linux / macOS:**
+```bash
+python3 orcahunter.py \
+  -s ~/.config/OrcaSlicer/system \
+  -s ~/.config/OrcaSlicer/user \
+  -b "My Printer.json" \
+  -b "Generic PLA.json"
+```
+
+**Windows:**
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer\system" ^
+  -s "%APPDATA%\OrcaSlicer\user" ^
+  -b "My Printer.json" ^
+  -b "Generic PLA.json"
+```
+
+Key behaviours:
+- Search is **recursive** — all subdirectories are included automatically.
+- Multiple `-s` flags are allowed and searched in order.
+- The parent directory of each profile file you specify is **always** added to the search path automatically, even without `-s`.
+- If the same filename is found in more than one location, `orcahunter` will error and list the duplicates so you can resolve the ambiguity. Paths containing `backup` in any directory component are automatically excluded from search.
+- Use `-S` to specify separate search directories for diff profiles. If `-S` is omitted, the `-s` directories are used for both sides.
+
 ### Specifying Profiles
 
-There are two ways to specify profile files:
+Profile files are specified with `-b` (baseline) and `-d` (diff). You can pass either a full path or just a filename — if just a filename is given, `orcahunter` searches for it across your `-s` directories.
+
+There are two ways to tell `orcahunter` which section (machine / filament / process) a file belongs to:
 
 **1. Inferred role (`-b` / `-d`):**  
-The section role (machine / filament / process) is inferred from the file's **parent directory name**. This works naturally with standard OrcaSlicer profile directory layouts.
+The section role is inferred from the file's **parent directory name**. This works naturally with standard OrcaSlicer profile directory layouts where files live inside folders named `machine`, `filament`, or `process`.
 
+*Linux / macOS — full paths, role inferred from directory:*
 ```bash
-orcahunter.py \
+python3 orcahunter.py \
   -b /profiles/machine/My\ Printer.json \
   -b /profiles/filament/Generic\ PLA.json \
   -b /profiles/process/0.2mm\ Standard.json \
   -s /profiles
 ```
 
-**2. Explicit role (`--base-machine`, `--base-filament`, `--base-process`):**  
-Use these when the file is not inside a directory named `machine`, `filament`, or `process`.
+*Windows — filenames only, role inferred from directory once found:*
+```bat
+python orcahunter.py ^
+  -b "My Printer.json" ^
+  -b "Generic PLA.json" ^
+  -b "0.2mm Standard.json" ^
+  -s "%APPDATA%\OrcaSlicer"
+```
 
+**2. Explicit role (`--base-machine`, `--base-filament`, `--base-process`):**  
+Use these when the file is not inside a directory named `machine`, `filament`, or `process` — for example, files copied to your Desktop or a working folder.
+
+*Linux / macOS:*
 ```bash
-orcahunter.py \
+python3 orcahunter.py \
   --base-machine "My Printer.json" \
   --base-filament "Generic PLA.json" \
   --base-process "0.2mm Standard.json" \
   -s /profiles
 ```
 
-You do not need to provide all three sections. Any combination is valid — provide only the sections you care about.
-
-### Specifying Search Directories
-
-`orcahunter` needs to find inherited parent files. Use `-s` to tell it where to search:
-
-```bash
-orcahunter.py -b filament/PLA.json -s /path/to/orcaslicer/system -s /path/to/custom/profiles
+*Windows:*
+```bat
+python orcahunter.py ^
+  --base-machine "My Printer.json" ^
+  --base-filament "Generic PLA.json" ^
+  --base-process "0.2mm Standard.json" ^
+  -s "%APPDATA%\OrcaSlicer"
 ```
 
-- Search is **recursive** — subdirectories are included automatically.
-- Multiple `-s` flags are allowed and searched in order.
-- Profile file parent directories are **always** searched automatically, even without `-s`.
-- If a filename appears in more than one location (excluding backup paths), `orcahunter` will error and list the duplicates so you can resolve the ambiguity.
+You do not need to provide all three sections. Any combination is valid — provide only the sections you care about.
 
 ### All Options
 
@@ -456,44 +519,87 @@ Diff mode is triggered whenever any `-d` / `--diff-*` flag is provided. Output s
 
 ### View the full effective settings for a printer/filament/process combination
 
+*Linux / macOS:*
 ```bash
 python3 orcahunter.py \
-  -b "machine/My Printer 0.4 nozzle.json" \
-  -b "filament/Generic PLA.json" \
-  -b "process/0.2mm Standard.json" \
-  -s ~/Library/Application\ Support/OrcaSlicer/system \
-  -s ~/Library/Application\ Support/OrcaSlicer/user
+  -s ~/.config/OrcaSlicer/system \
+  -s ~/.config/OrcaSlicer/user \
+  -b "My Printer 0.4 nozzle.json" \
+  -b "Generic PLA.json" \
+  -b "0.2mm Standard.json"
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer\system" ^
+  -s "%APPDATA%\OrcaSlicer\user" ^
+  -b "My Printer 0.4 nozzle.json" ^
+  -b "Generic PLA.json" ^
+  -b "0.2mm Standard.json"
 ```
 
 ### View only settings that are overridden (no-noise mode)
 
+*Linux / macOS:*
 ```bash
 python3 orcahunter.py \
-  -b "machine/My Printer.json" \
-  -b "filament/Generic PLA.json" \
-  -b "process/0.2mm.json" \
-  -s /profiles \
+  -s ~/.config/OrcaSlicer \
+  -b "My Printer.json" \
+  -b "Generic PLA.json" \
+  -b "0.2mm Standard.json" \
+  --overrides-only
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer" ^
+  -b "My Printer.json" ^
+  -b "Generic PLA.json" ^
+  -b "0.2mm Standard.json" ^
   --overrides-only
 ```
 
 ### Search for all retraction-related settings
 
+*Linux / macOS:*
 ```bash
 python3 orcahunter.py \
-  -b "machine/My Printer.json" \
-  -b "filament/Generic PLA.json" \
-  -s /profiles \
+  -s ~/.config/OrcaSlicer \
+  -b "My Printer.json" \
+  -b "Generic PLA.json" \
+  --filter retraction
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer" ^
+  -b "My Printer.json" ^
+  -b "Generic PLA.json" ^
   --filter retraction
 ```
 
 ### Show the full inheritance chain detail for overridden settings
 
+*Linux / macOS:*
 ```bash
 python3 orcahunter.py \
-  -b "machine/My Printer.json" \
-  -b "filament/Generic PLA.json" \
-  -b "process/0.2mm.json" \
-  -s /profiles \
+  -s ~/.config/OrcaSlicer \
+  -b "My Printer.json" \
+  -b "Generic PLA.json" \
+  -b "0.2mm Standard.json" \
+  --show-inheritance --overrides-only
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer" ^
+  -b "My Printer.json" ^
+  -b "Generic PLA.json" ^
+  -b "0.2mm Standard.json" ^
   --show-inheritance --overrides-only
 ```
 
@@ -501,76 +607,149 @@ python3 orcahunter.py \
 
 Machine and process are shared from baseline — only specify what changes:
 
+*Linux / macOS:*
 ```bash
 python3 orcahunter.py \
-  -b "machine/My Printer.json" \
-  -b "filament/Generic PLA.json" \
-  -b "process/0.2mm Standard.json" \
-  -d "filament/Generic PETG.json" \
-  -s /profiles
+  -s ~/.config/OrcaSlicer \
+  -b "My Printer.json" \
+  -b "Generic PLA.json" \
+  -b "0.2mm Standard.json" \
+  -d "Generic PETG.json"
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer" ^
+  -b "My Printer.json" ^
+  -b "Generic PLA.json" ^
+  -b "0.2mm Standard.json" ^
+  -d "Generic PETG.json"
 ```
 
 ### Diff a custom filament against a system filament
 
+*Linux / macOS:*
 ```bash
 python3 orcahunter.py \
+  -s ~/.config/OrcaSlicer/system \
+  -s ~/.config/OrcaSlicer/user \
   --base-filament "Generic PLA.json" \
-  --diff-filament "My Custom PLA.json" \
-  -s ~/OrcaSlicer/system \
-  -s ~/OrcaSlicer/user
+  --diff-filament "My Custom PLA.json"
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer\system" ^
+  -s "%APPDATA%\OrcaSlicer\user" ^
+  --base-filament "Generic PLA.json" ^
+  --diff-filament "My Custom PLA.json"
 ```
 
 ### Diff two complete profiles — different machine and filament
 
+*Linux / macOS:*
 ```bash
 python3 orcahunter.py \
-  -b "machine/Printer A.json" \
-  -b "filament/Generic PLA.json" \
-  -b "process/0.2mm.json" \
-  -d "machine/Printer B.json" \
-  -d "filament/Generic PLA.json" \
-  -s /profiles
+  -s ~/.config/OrcaSlicer \
+  -b "Printer A.json" \
+  -b "Generic PLA.json" \
+  -b "0.2mm Standard.json" \
+  -d "Printer B.json" \
+  -d "Generic PETG.json"
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer" ^
+  -b "Printer A.json" ^
+  -b "Generic PLA.json" ^
+  -b "0.2mm Standard.json" ^
+  -d "Printer B.json" ^
+  -d "Generic PETG.json"
 ```
 
 ### Save output to a file for archiving or sharing
 
+*Linux / macOS:*
 ```bash
 python3 orcahunter.py \
-  -b "machine/My Printer.json" \
-  -b "filament/Generic PLA.json" \
-  -b "process/0.2mm.json" \
-  -s /profiles \
+  -s ~/.config/OrcaSlicer \
+  -b "My Printer.json" \
+  -b "Generic PLA.json" \
+  -b "0.2mm Standard.json" \
+  --output my_profile_dump.txt
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer" ^
+  -b "My Printer.json" ^
+  -b "Generic PLA.json" ^
+  -b "0.2mm Standard.json" ^
   --output my_profile_dump.txt
 ```
 
 ### Filter and save only retraction settings to a file
 
+*Linux / macOS:*
 ```bash
 python3 orcahunter.py \
-  -b "machine/My Printer.json" \
-  -b "filament/Generic PLA.json" \
-  -s /profiles \
+  -s ~/.config/OrcaSlicer \
+  -b "My Printer.json" \
+  -b "Generic PLA.json" \
   --filter retraction \
   --output retraction_settings.txt
 ```
 
-### Explicit roles (files not in standard directory layout)
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer" ^
+  -b "My Printer.json" ^
+  -b "Generic PLA.json" ^
+  --filter retraction ^
+  --output retraction_settings.txt
+```
 
+### Explicit roles (files not in a standard machine/filament/process directory)
+
+*Linux / macOS:*
 ```bash
 python3 orcahunter.py \
+  -s ~/.config/OrcaSlicer \
   --base-machine "My Printer.json" \
   --base-filament "Generic PLA.json" \
-  --base-process "0.2mm Standard.json" \
-  -s /profiles/system \
-  -s /profiles/custom
+  --base-process "0.2mm Standard.json"
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer" ^
+  --base-machine "My Printer.json" ^
+  --base-filament "Generic PLA.json" ^
+  --base-process "0.2mm Standard.json"
 ```
 
 ### Skip inherited files that cannot be found
 
+*Linux / macOS:*
 ```bash
 python3 orcahunter.py \
-  -b "filament/Experimental PLA.json" \
-  -s /profiles \
+  -s ~/.config/OrcaSlicer \
+  -b "Experimental PLA.json" \
+  --ignore-missing
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer" ^
+  -b "Experimental PLA.json" ^
   --ignore-missing
 ```
 
@@ -578,33 +757,63 @@ python3 orcahunter.py \
 
 Useful when comparing profiles from two different OrcaSlicer installations or versions:
 
+*Linux / macOS:*
 ```bash
 python3 orcahunter.py \
-  -b "machine/My Printer.json" \
-  -b "filament/Generic PLA.json" \
-  -s /orcaslicer_v1/system \
-  -d "filament/Generic PLA.json" \
-  -S /orcaslicer_v2/system
+  -s /opt/orcaslicer_v1/resources/profiles \
+  -b "My Printer.json" \
+  -b "Generic PLA.json" \
+  -S /opt/orcaslicer_v2/resources/profiles \
+  -d "Generic PLA.json"
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "C:\Program Files\OrcaSlicer_v1\resources\profiles" ^
+  -b "My Printer.json" ^
+  -b "Generic PLA.json" ^
+  -S "C:\Program Files\OrcaSlicer_v2\resources\profiles" ^
+  -d "Generic PLA.json"
 ```
 
 ---
 
 ## Color Customization
 
-Colors are defined as constants near the top of `orcahunter.py` and can be changed without touching any logic:
+Output colors are configured in the `colors` block of `orcahunter_config.json` — no code editing required:
 
-```python
-COLOR_KEY      = COLORS["bright_white"]   # setting key names
-COLOR_VALUE    = COLORS["cyan"]           # effective values
-COLOR_MARKER   = COLORS["bright_yellow"]  # (*) override marker
-COLOR_MACHINE  = COLORS["blue"]           # machine section labels
-COLOR_FILAMENT = COLORS["green"]          # filament section labels
-COLOR_PROCESS  = COLORS["yellow"]         # process section labels
-COLOR_SOURCE   = COLORS["dim"]            # source filenames
-COLOR_HEADER   = COLORS["bold"]           # section headers
+```json
+"colors": {
+    "key":          "bright_white",
+    "value":        "cyan",
+    "marker":       "bright_yellow",
+    "machine":      "blue",
+    "filament":     "green",
+    "process":      "yellow",
+    "source":       "dim",
+    "header":       "bold",
+    "winner":       "bright_cyan",
+    "loser":        "red",
+    "diff_changed": "bright_yellow"
+}
 ```
 
-All standard ANSI colors are available in the `COLORS` dict: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, and their `bright_` variants, plus `bold` and `dim`.
+| Role           | Controls                                                      |
+|----------------|---------------------------------------------------------------|
+| `key`          | Setting key names                                             |
+| `value`        | Effective values                                              |
+| `marker`       | `(*)` override marker                                         |
+| `machine`      | Machine section labels and sources                            |
+| `filament`     | Filament section labels and sources                           |
+| `process`      | Process section labels and sources                            |
+| `source`       | Source filenames in override detail                           |
+| `header`       | Section headers                                               |
+| `winner`       | Winning (effective) value in override detail                  |
+| `loser`        | Losing (overridden) values in override detail                 |
+| `diff_changed` | Changed value on the diff side in diff mode                   |
+
+Valid color names: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, and their `bright_` variants (e.g. `bright_cyan`), plus `bold` and `dim`. An invalid color name will produce an error at startup identifying the bad entry.
 
 Color output is automatically disabled when writing to a file (`--output`) or when stdout is not a terminal. Use `--no-color` to disable it explicitly.
 
