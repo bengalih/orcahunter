@@ -12,7 +12,7 @@ Each of these three sections is not a single flat file. Each one is itself built
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -36,13 +36,13 @@ Each of these three sections is not a single flat file. Each one is itself built
 
 ---
 
-## ⚙️ Requirements
+## Requirements ⚙️
 
 - Python 3.10 or later
 
 ---
 
-## 🚀 Installation
+## Installation 🚀
 
 1. Copy `orcahunter.py` and `orcahunter_config.json` to the same directory.
 2. Make it executable (Linux/macOS):
@@ -58,7 +58,7 @@ Both files must always remain in the same directory. `orcahunter` locates its co
 
 ---
 
-## 🖨️ How OrcaSlicer Profiles Work
+## How OrcaSlicer Profiles Work 🖨️
 
 OrcaSlicer profiles are organized into three **sections**, each stored as a JSON file:
 
@@ -83,7 +83,7 @@ A setting defined in `My Printer.json` overrides the same setting in any ancesto
 
 ---
 
-## 🔍 How orcahunter Works
+## How orcahunter Works 🔍
 
 ### Inheritance Resolution
 
@@ -151,7 +151,7 @@ Settings with any override are marked with `(*)` in the Effective Values listing
 
 ---
 
-## 🗂️ Configuration File
+## Configuration File 🗂️
 
 `orcahunter_config.json` must live alongside `orcahunter.py`. It controls two things:
 
@@ -216,7 +216,7 @@ The config JSON can be edited by the end user to add or change overrides. This s
 
 ---
 
-## 💻 Usage
+## Usage 💻
 
 ```
 orcahunter.py [-h] [-b FILE] [--base-machine FILE] [--base-filament FILE]
@@ -311,7 +311,7 @@ Omitted diff roles automatically fall back to the corresponding baseline profile
 
 ---
 
-## 📄 Output Format
+## Output Format 📄
 
 ### Single Profile Mode
 
@@ -452,7 +452,7 @@ Diff mode is triggered whenever any `-d` / `--diff-*` flag is provided. Output s
 
 ---
 
-## 💡 Examples
+## Examples 💡
 
 ### View the full effective settings for a printer/filament/process combination
 
@@ -589,7 +589,7 @@ python3 orcahunter.py \
 
 ---
 
-## 🎨 Color Customization
+## Color Customization 🎨
 
 Colors are defined as constants near the top of `orcahunter.py` and can be changed without touching any logic:
 
@@ -610,7 +610,7 @@ Color output is automatically disabled when writing to a file (`--output`) or wh
 
 ---
 
-## 🔧 Extending the Config
+## Extending the Config 🔧
 
 ### Adding new filament override keys
 
