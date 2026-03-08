@@ -37,11 +37,15 @@ Each of these three sections is not a single flat file. Each one is itself built
 
 ---
 
+<a name="requirements"></a>
+
 ## ⚙️ Requirements
 
 - Python 3.10 or later
 
 ---
+
+<a name="installation"></a>
 
 ## 🚀 Installation
 
@@ -58,6 +62,8 @@ Each of these three sections is not a single flat file. Each one is itself built
 Both files must always remain in the same directory. `orcahunter` locates its config by looking alongside itself.
 
 ---
+
+<a name="how-orcaslicer-profiles-work"></a>
 
 ## 🖨️ How OrcaSlicer Profiles Work
 
@@ -83,6 +89,8 @@ fdm_machine_base.json               ← root (most general)
 A setting defined in `My Printer.json` overrides the same setting in any ancestor.
 
 ---
+
+<a name="how-orcahunter-works"></a>
 
 ## 🔍 How orcahunter Works
 
@@ -152,6 +160,8 @@ Each setting in the output is classified at display time:
 Settings with a confirmed override are marked `(*)`. Settings where a filament override key is present but no base value exists to compare against are marked `(?)`.
 
 ---
+
+<a name="configuration-file"></a>
 
 ## 🗂️ Configuration File
 
@@ -237,6 +247,8 @@ The config file has a `"version"` integer field. `orcahunter` will refuse to run
 The config JSON can be edited by the end user to add or change overrides. This should be done with caution and should be based on the overrides defined in the OrcaSlicer source (`/src/libslic3r/Preset.cpp`). See [Extending the Config](#extending-the-config) for more information.
 
 ---
+
+<a name="usage"></a>
 
 ## 💻 Usage
 
@@ -375,6 +387,8 @@ Omitted diff roles automatically fall back to the corresponding baseline profile
 | | `--ignore-missing` | Warn and skip inherited files that cannot be found, rather than erroring. |
 
 ---
+
+<a name="output-format"></a>
 
 ## 📄 Output Format
 
@@ -516,6 +530,8 @@ Diff mode is triggered whenever any `-d` / `--diff-*` flag is provided. Output s
 ```
 
 ---
+
+<a name="examples"></a>
 
 ## 💡 Examples
 
@@ -781,6 +797,8 @@ python orcahunter.py ^
 
 ---
 
+<a name="color-customization"></a>
+
 ## 🎨 Color Customization
 
 Output colors are configured in the `colors` block of `orcahunter_config.json` — no code editing required:
@@ -820,6 +838,8 @@ Valid color names: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`,
 Color output is automatically disabled when writing to a file (`--output`) or when stdout is not a terminal. Use `--no-color` to disable it explicitly.
 
 ---
+
+<a name="extending-the-config"></a>
 
 ## 🔧 Extending the Config
 
@@ -865,6 +885,8 @@ If OrcaSlicer adds new structural/administrative keys that should not appear in 
 The `"version"` field in `orcahunter_config.json` allows the script to detect incompatible config files. If you make breaking changes to the config structure, increment the version and update `CONFIG_MIN_VERSION` in `orcahunter.py` accordingly.
 
 ---
+
+<a name="limitations"></a>
 
 ## ⚠️ Limitations
 
