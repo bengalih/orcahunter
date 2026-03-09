@@ -26,6 +26,7 @@ Each of these three sections is not a single flat file. Each one is itself built
 - [Usage 💻](#usage)
   - [Specifying Search Directories](#specifying-search-directories)
   - [Specifying Profiles](#specifying-profiles)
+  - [Auto Mode](#auto-mode)
   - [All Options](#all-options)
 - [Output Format 📄](#output-format)
   - [Single Profile Mode](#single-profile-mode)
@@ -253,12 +254,15 @@ The config JSON can be edited by the end user to add or change overrides. This s
 ## 💻 Usage
 
 ```
-orcahunter.py [-h] [-b FILE] [--base-machine FILE] [--base-filament FILE]
+orcahunter.py [-h] [--auto] [-b FILE] [--base-machine FILE] [--base-filament FILE]
               [--base-process FILE] [-d FILE] [--diff-machine FILE]
               [--diff-filament FILE] [--diff-process FILE]
-              [-s DIR] [-S DIR] [-f TEXT] [-o]
-              [--show-inheritance] [--full-gcode] [--no-color]
-              [--output FILE] [--ignore-missing]
+              [-s DIR] [-S DIR] [-f TEXT]
+              [--overrides-only] [--values-only]
+              [--show-inheritance] [--full-gcode] [--show-paths]
+              [--color-code-values] [--no-color]
+              [--ignore-type] [--diff-changed-only] [--conf FILE]
+              [--ignore-missing] [--output FILE]
 ```
 
 ### Specifying Search Directories
@@ -301,7 +305,7 @@ Profile files are specified with `-b` (baseline) and `-d` (diff). You can pass e
 
 There are two ways to tell `orcahunter` which section (machine / filament / process) a file belongs to:
 
-**1. Inferred role (`-b` / `-d`):**  
+**1. Inferred role (`-b` / `-d`):**
 The section role is inferred from the file's **parent directory name**. This works naturally with standard OrcaSlicer profile directory layouts where files live inside folders named `machine`, `filament`, or `process`.
 
 *Linux / macOS — full paths, role inferred from directory:*
@@ -322,7 +326,7 @@ python orcahunter.py ^
   -s "%APPDATA%\OrcaSlicer"
 ```
 
-**2. Explicit role (`--base-machine`, `--base-filament`, `--base-process`):**  
+**2. Explicit role (`--base-machine`, `--base-filament`, `--base-process`):**
 Use these when the file is not inside a directory named `machine`, `filament`, or `process` — for example, files copied to your Desktop or a working folder.
 
 *Linux / macOS:*
@@ -345,46 +349,101 @@ python orcahunter.py ^
 
 You do not need to provide all three sections. Any combination is valid — provide only the sections you care about.
 
+### Auto Mode
+
+`--auto` reads the currently active machine, filament, and process profile names directly from `orcaslicer.conf` — the same runtime state file OrcaSlicer writes when you have profiles selected in the GUI. This means you can run `orcahunter` without specifying any `-b` files at all, and it will resolve exactly what OrcaSlicer currently has loaded.
+
+*Linux / macOS:*
+```bash
+python3 orcahunter.py --auto -s ~/.config/OrcaSlicer
+```
+
+*Windows:*
+```bat
+python orcahunter.py --auto -s "%APPDATA%\OrcaSlicer"
+```
+
+Key behaviours:
+- `--auto` requires at least one `-s` search directory, which is where `orcaslicer.conf` is searched for.
+- `--auto` and `-b` are **additive**: `-b` overrides `--auto` on a per-role basis. For example, `--auto -b "Other PLA.json"` uses the active machine and process from the conf, but substitutes the specified filament.
+- The active bed type is read from the conf and displayed in the header.
+- Profile names sourced from `--auto` are annotated with `(*)` in the chain header.
+- By default `orcaslicer.conf` is searched by name within the `-s` directories. Use `--conf` to specify a different conf file by name or path.
+
+**Using a custom conf file:**
+
+If your conf file has a non-standard name or location, use `--conf`:
+
+```bash
+# Bare filename — searched within the -s directories
+python3 orcahunter.py --auto --conf my_orca.conf -s ~/.config/OrcaSlicer
+
+# Explicit path — used directly
+python3 orcahunter.py --auto --conf /path/to/orcaslicer.conf -s ~/.config/OrcaSlicer
+```
+
 ### All Options
 
-#### Baseline Profile
+#### Profile Input (Baseline)
 
-| Flag | Long form | Description |
-|------|-----------|-------------|
-| `-b FILE` | `--base FILE` | Baseline profile JSON. Role inferred from parent dir. Repeatable. |
-| | `--base-machine FILE` | Baseline machine profile (explicit role). |
-| | `--base-filament FILE` | Baseline filament profile (explicit role). |
-| | `--base-process FILE` | Baseline process profile (explicit role). |
+| Flag | Description |
+|------|-------------|
+| `--auto` | Read active machine/filament/process from `orcaslicer.conf` in the `-s` dirs. Additive with `-b`. |
+| `-b FILE` / `--base FILE` | Baseline profile JSON. Role inferred from parent dir name. Repeatable. |
+| `--base-machine FILE` | Baseline machine profile (explicit role). |
+| `--base-filament FILE` | Baseline filament profile (explicit role). |
+| `--base-process FILE` | Baseline process profile (explicit role). |
 
-#### Diff Profile
+#### Profile Input (Diff)
 
 Omitted diff roles automatically fall back to the corresponding baseline profile, so you only need to specify what differs.
 
-| Flag | Long form | Description |
-|------|-----------|-------------|
-| `-d FILE` | `--diff FILE` | Diff profile JSON. Role inferred from parent dir. Repeatable. |
-| | `--diff-machine FILE` | Diff machine profile (explicit role). |
-| | `--diff-filament FILE` | Diff filament profile (explicit role). |
-| | `--diff-process FILE` | Diff process profile (explicit role). |
+| Flag | Description |
+|------|-------------|
+| `-d FILE` / `--diff FILE` | Diff profile JSON. Role inferred from parent dir name. Repeatable. |
+| `--diff-machine FILE` | Diff machine profile (explicit role). |
+| `--diff-filament FILE` | Diff filament profile (explicit role). |
+| `--diff-process FILE` | Diff process profile (explicit role). |
 
 #### Search Paths
 
-| Flag | Long form | Description |
-|------|-----------|-------------|
-| `-s DIR` | `--search-dir DIR` | Baseline search dir (recursive). Repeatable. |
-| `-S DIR` | `--diff-search-dir DIR` | Diff search dir (recursive). Repeatable. Defaults to `-s` dirs if omitted. |
+| Flag | Description |
+|------|-------------|
+| `-s DIR` / `--search-dir DIR` | Baseline search dir (recursive). Repeatable. Also used for `--auto` conf lookup. |
+| `-S DIR` / `--diff-search-dir DIR` | Diff search dir (recursive). Repeatable. Defaults to `-s` dirs if omitted. |
 
-#### Output Options
+#### Filtering
 
-| Flag | Long form | Description |
-|------|-----------|-------------|
-| `-f TEXT` | `--filter TEXT` | Only show keys whose name contains TEXT (case-insensitive). |
-| `-o` | `--overrides-only` | Show only overridden settings. Single-profile mode only. |
-| | `--show-inheritance` | Expand override detail to show the full per-file inheritance chain. |
-| | `--full-gcode` | Show full gcode values untruncated (default: truncate at 150 chars). |
-| | `--no-color` | Disable ANSI color output. |
-| | `--output FILE` | Write output to FILE instead of stdout (implies `--no-color`). |
-| | `--ignore-missing` | Warn and skip inherited files that cannot be found, rather than erroring. |
+| Flag | Description |
+|------|-------------|
+| `-f TEXT` / `--filter TEXT` | Only show keys whose name contains TEXT (case-insensitive). |
+| `--overrides-only` | Show only overridden (`*`) and unconfirmed (`?`) settings. Single-profile mode only. |
+| `--values-only` | Show only the Effective Values section; suppress Override Detail and Counts. Pairs well with `-f` for quick targeted lookups. |
+
+#### Display
+
+| Flag | Description |
+|------|-------------|
+| `--show-inheritance` | Expand Override Detail to show every file in the inherit chain, not just the section tip. |
+| `--full-gcode` | Show full gcode values untruncated (default: truncate at 75 chars). |
+| `--show-paths` | Show full file paths in the chain header (default: filenames only). |
+| `--color-code-values` | Color each key name by its winning section: machine=blue, filament=green, process=yellow. |
+| `--no-color` | Disable ANSI color output. |
+
+#### Comparison
+
+| Flag | Description |
+|------|-------------|
+| `--ignore-type` | Treat a scalar and a single-element array as equal (e.g. `150 == [150]`). Suppresses false positives from storage format differences between profiles. |
+| `--diff-changed-only` | Diff mode only: show only changed values. Suppresses the "Only in baseline" and "Only in diff" sections. |
+| `--conf FILE` | Conf file for `--auto`. Bare filename is searched within the `-s` directories; any path with separators is used directly. |
+
+#### Output
+
+| Flag | Description |
+|------|-------------|
+| `--ignore-missing` | Warn and skip inherited files that cannot be found, rather than erroring. |
+| `--output FILE` | Write output to FILE instead of stdout (implies `--no-color`). |
 
 ---
 
@@ -398,67 +457,74 @@ Output is divided into three sections:
 
 #### Header
 
-Shows the full resolved inheritance chain for each section, child-first:
+Shows the full resolved inheritance chain for each section, child-first. When using `--auto`, roles sourced from the conf are annotated with `(*)` and the active bed type is shown:
 
 ```
 ==============================================================================
   OrcaSlicer Effective Settings
 ==============================================================================
-  MACHINE
-    /profiles/machine/My Printer.json  -->
-    /profiles/system/fdm_vendor_common.json  -->
-    /profiles/system/fdm_machine_common.json  -->
-    /profiles/system/fdm_machine_base.json
-  FILAMENT
-    /profiles/filament/Generic PLA.json  -->
-    /profiles/system/fdm_filament_pla_common.json  -->
-    /profiles/system/fdm_filament_base.json
-  PROCESS
-    /profiles/process/0.2mm Standard.json  -->
-    /profiles/system/fdm_process_base.json
-==============================================================================
+  MACHINE (*)
+    My Printer.json  -->
+    fdm_vendor_common.json  -->
+    fdm_machine_common.json  -->
+    fdm_machine_base.json
+  FILAMENT (*)
+    Generic PLA.json  -->
+    fdm_filament_pla_common.json  -->
+    fdm_filament_base.json
+  PROCESS (*)
+    0.2mm Standard.json  -->
+    fdm_process_base.json
+  (*) Derived from orcaslicer.conf  --auto
+  Active Bed Type:  Smooth High Temp Plate  (curr_bed_type=3)
+  --------------------------------------------------------------------------
 ```
+
+Without `--auto` the `(*)` annotation and bed type line are omitted. With `--show-paths`, full file paths are shown instead of filenames.
 
 #### Effective Values
 
-Every setting with its winning value. Settings marked `(*)` were arrived at via one or more overrides:
+Every setting with its winning value. Settings marked `(*)` were arrived at via one or more overrides. Settings marked `(?)` have a filament override key set but no base key found to compare against:
 
 ```
-  Effective Values  (* = overridden)
-  ----------------------------------------------------------------------------
+==============================================================================
+  Effective Values
+==============================================================================
+  (* = overridden)  (? = filament override, no base found)
+  --------------------------------------------------------------------------
 
   bed_temperature: 35
   cool_plate_temp: 35
-  cool_plate_temp_initial_layer: 35
-  default_filament_colour: []
   enable_overhang_bridge_fan: 1  (*)
-  fan_cooling_layer_time: 100
   fan_max_speed: 100  (*)
+  ironing_inset: 2  (?)
   retraction_speed: 45  (*)
   travel_speed: 250  (*)
 ```
+
+With `--color-code-values`, each key name is colored by its winning section (blue=machine, green=filament, yellow=process) rather than the default white. With `--overrides-only`, only `(*)` and `(?)` lines are shown. With `--values-only`, output stops after this section.
 
 #### Override Detail
 
 Every overridden setting showing each contributing value, lowest priority first. The last (winning) entry is highlighted:
 
 ```
+==============================================================================
   Override Detail
-  ----------------------------------------------------------------------------
-  Lowest priority first. Last entry is the effective value.
-  ----------------------------------------------------------------------------
+==============================================================================
+  Section overrides only. Run with --show-inheritance to see inherit-chain detail.
+  --------------------------------------------------------------------------
 
   retraction_speed: 45
-    [40]  (fdm_machine_common.json)  [retraction_speed]
-    [50]  (fdm_vendor_common.json)  [retraction_speed]
-    [45]  (Generic PLA.json)  [filament_retraction_speed]
+    [40]  (fdm_machine_common.json: retraction_speed)
+    [45]  (Generic PLA.json: filament_retraction_speed)
 
   travel_speed: 250
-    [200]  (fdm_machine_common.json)  [travel_speed]
-    [250]  (My Printer.json)  [travel_speed]
+    [200]  (fdm_machine_common.json: travel_speed)
+    [250]  (My Printer.json: travel_speed)
 ```
 
-With `--show-inheritance`, every file in the full inheritance chain is shown rather than just the tip of each section.
+With `--show-inheritance`, every file in the full inheritance chain is shown rather than just the section tip, and the header note changes to reflect this.
 
 #### Counts
 
@@ -470,24 +536,15 @@ With `--show-inheritance`, every file in the full inheritance chain is shown rat
   No override       : 50
   Section overrides : 6
     filament_ prefix  : 1
+  Inherit overrides : 10 (suppressed — use --show-inheritance)
+  No base found (?) : 1
 ```
 
-With `--show-inheritance`, an additional line appears:
-
-```
-==============================================================================
-  Counts
-==============================================================================
-  Total settings    : 56
-  No override       : 40
-  Section overrides : 6
-    filament_ prefix  : 1
-  Inherit overrides : 10
-```
+`Total settings` and `Section overrides` reflect the displayed set (narrowed by `--overrides-only` or `--filter` if used). `No override` always reflects the full dataset regardless of display filters, so you can see the full picture at a glance. `Inherit overrides` is only shown if any exist; when suppressed (default), it prompts you to use `--show-inheritance`.
 
 ### Diff Mode
 
-Diff mode is triggered whenever any `-d` / `--diff-*` flag is provided. Output shows three categorized sections followed by a summary:
+Diff mode is triggered whenever any `-d` / `--diff-*` flag is provided. Output shows categorized sections followed by a summary.
 
 ```
 ==============================================================================
@@ -495,29 +552,33 @@ Diff mode is triggered whenever any `-d` / `--diff-*` flag is provided. Output s
 ==============================================================================
   BASELINE
     FILAMENT
-      /profiles/filament/Generic PLA.json  -->
-      /profiles/system/fdm_filament_base.json
+      Generic PLA.json  -->
+      fdm_filament_pla_common.json  -->
+      fdm_filament_base.json
   DIFF
     FILAMENT
-      /profiles/filament/Generic PETG.json  -->
-      /profiles/system/fdm_filament_petg_common.json  -->
-      /profiles/system/fdm_filament_base.json
+      Generic PETG.json  -->
+      fdm_filament_petg_common.json  -->
+      fdm_filament_base.json
 ==============================================================================
 
+==============================================================================
   Changed  (4)
-  ----------------------------------------------------------------------------
+==============================================================================
   bed_temperature:  35  ->  70
   fan_max_speed:  100  ->  60
   filament_max_volumetric_speed:  21  ->  14
   nozzle_temperature:  220  ->  240
 
+==============================================================================
   Only in baseline  (2)
-  ----------------------------------------------------------------------------
+==============================================================================
   cool_plate_temp: 35
   cool_plate_temp_initial_layer: 35
 
+==============================================================================
   Only in diff  (1)
-  ----------------------------------------------------------------------------
+==============================================================================
   eng_plate_temp: 70
 
 ==============================================================================
@@ -529,11 +590,29 @@ Diff mode is triggered whenever any `-d` / `--diff-*` flag is provided. Output s
   Identical        : 49
 ```
 
+With `--ignore-type`, values that differ only in scalar-vs-array form (e.g. `150` vs `[150]`) are separated into an additional `Ignored (type mismatch)` section shown in dim text, and counted separately in the Summary. These are suppressed from the `Changed` section to avoid noise when comparing profiles from different OrcaSlicer versions that store the same value in different forms.
+
+With `--diff-changed-only`, the `Only in baseline` and `Only in diff` sections and their Summary lines are suppressed — only `Changed` (and `Ignored` if applicable) are shown.
+
 ---
 
 <a name="examples"></a>
 
 ## 💡 Examples
+
+### View the active profile (auto mode)
+
+The simplest invocation — reads whatever OrcaSlicer currently has loaded:
+
+*Linux / macOS:*
+```bash
+python3 orcahunter.py --auto -s ~/.config/OrcaSlicer
+```
+
+*Windows:*
+```bat
+python orcahunter.py --auto -s "%APPDATA%\OrcaSlicer"
+```
 
 ### View the full effective settings for a printer/filament/process combination
 
@@ -579,7 +658,7 @@ python orcahunter.py ^
   --overrides-only
 ```
 
-### Search for all retraction-related settings
+### Quick lookup of a specific setting
 
 *Linux / macOS:*
 ```bash
@@ -587,7 +666,8 @@ python3 orcahunter.py \
   -s ~/.config/OrcaSlicer \
   -b "My Printer.json" \
   -b "Generic PLA.json" \
-  --filter retraction
+  --filter retraction \
+  --values-only
 ```
 
 *Windows:*
@@ -596,7 +676,8 @@ python orcahunter.py ^
   -s "%APPDATA%\OrcaSlicer" ^
   -b "My Printer.json" ^
   -b "Generic PLA.json" ^
-  --filter retraction
+  --filter retraction ^
+  --values-only
 ```
 
 ### Show the full inheritance chain detail for overridden settings
@@ -643,6 +724,66 @@ python orcahunter.py ^
   -b "Generic PLA.json" ^
   -b "0.2mm Standard.json" ^
   -d "Generic PETG.json"
+```
+
+### Diff the active profile against a candidate filament
+
+*Linux / macOS:*
+```bash
+python3 orcahunter.py \
+  --auto \
+  -s ~/.config/OrcaSlicer \
+  -d "My Custom PLA.json"
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  --auto ^
+  -s "%APPDATA%\OrcaSlicer" ^
+  -d "My Custom PLA.json"
+```
+
+### Diff and show only what changed (suppress unique keys)
+
+*Linux / macOS:*
+```bash
+python3 orcahunter.py \
+  -s ~/.config/OrcaSlicer \
+  -b "Generic PLA.json" \
+  -d "Generic PETG.json" \
+  --diff-changed-only
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "%APPDATA%\OrcaSlicer" ^
+  -b "Generic PLA.json" ^
+  -d "Generic PETG.json" ^
+  --diff-changed-only
+```
+
+### Suppress type-format false positives when diffing across versions
+
+*Linux / macOS:*
+```bash
+python3 orcahunter.py \
+  -s /opt/orcaslicer_v1/resources/profiles \
+  -b "Generic PLA.json" \
+  -S /opt/orcaslicer_v2/resources/profiles \
+  -d "Generic PLA.json" \
+  --ignore-type
+```
+
+*Windows:*
+```bat
+python orcahunter.py ^
+  -s "C:\Program Files\OrcaSlicer_v1\resources\profiles" ^
+  -b "Generic PLA.json" ^
+  -S "C:\Program Files\OrcaSlicer_v2\resources\profiles" ^
+  -d "Generic PLA.json" ^
+  --ignore-type
 ```
 
 ### Diff a custom filament against a system filament
@@ -709,28 +850,6 @@ python orcahunter.py ^
   -b "Generic PLA.json" ^
   -b "0.2mm Standard.json" ^
   --output my_profile_dump.txt
-```
-
-### Filter and save only retraction settings to a file
-
-*Linux / macOS:*
-```bash
-python3 orcahunter.py \
-  -s ~/.config/OrcaSlicer \
-  -b "My Printer.json" \
-  -b "Generic PLA.json" \
-  --filter retraction \
-  --output retraction_settings.txt
-```
-
-*Windows:*
-```bat
-python orcahunter.py ^
-  -s "%APPDATA%\OrcaSlicer" ^
-  -b "My Printer.json" ^
-  -b "Generic PLA.json" ^
-  --filter retraction ^
-  --output retraction_settings.txt
 ```
 
 ### Explicit roles (files not in a standard machine/filament/process directory)
@@ -821,13 +940,13 @@ Output colors are configured in the `colors` block of `orcahunter_config.json` �
 
 | Role           | Controls                                                      |
 |----------------|---------------------------------------------------------------|
-| `key`          | Setting key names                                             |
+| `key`          | Setting key names (also used as the base by `--color-code-values`; overridden per-section when active) |
 | `value`        | Effective values                                              |
 | `marker`       | `(*)` override marker                                         |
-| `machine`      | Machine section labels and sources                            |
-| `filament`     | Filament section labels and sources                           |
-| `process`      | Process section labels and sources                            |
-| `source`       | Source filenames in override detail                           |
+| `machine`      | Machine section labels, sources, and key names (with `--color-code-values`) |
+| `filament`     | Filament section labels, sources, and key names (with `--color-code-values`) |
+| `process`      | Process section labels, sources, and key names (with `--color-code-values`) |
+| `source`       | Source filenames in override detail and dim annotations       |
 | `header`       | Section headers                                               |
 | `winner`       | Winning (effective) value in override detail                  |
 | `loser`        | Losing (overridden) values in override detail                 |
@@ -901,10 +1020,10 @@ Rather than silently presenting the value as unoverridden, `orcahunter` marks it
 **Example:** Setting `filament_ironing_inset` in a filament profile when no ancestor defines `ironing_inset`:
 
 ```
-  ironing_flow: [16%]  (*)     ← confirmed override, ancestor had a different value
-  ironing_inset: [2]   (?)     ← filament override key set, but no base key found to compare
-  ironing_spacing: [0.2]  (*)  ← confirmed override
-  ironing_speed: [14]  (*)     ← confirmed override
+  ironing_flow: 16  (*)     ← confirmed override, ancestor had a different value
+  ironing_inset: 2  (?)     ← filament override key set, but no base key found to compare
+  ironing_spacing: 0.2  (*) ← confirmed override
+  ironing_speed: 14  (*)    ← confirmed override
 ```
 
 The most common cause is a setting that was added to OrcaSlicer after the vendor base profiles were last updated, or a setting that the vendor simply never explicitly defined (relying on OrcaSlicer's compiled default instead).
