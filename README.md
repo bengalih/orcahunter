@@ -143,7 +143,7 @@ In both cases `orcahunter` handles this transparently:
 - The `filament_` prefixed key **never appears** in the output effective values (but does appear in the override detail).
 - Its value is shown under the base key name (e.g. `retraction_speed`, `ironing_flow`).
 - If the value actually differs from the target section's value, a `(*)` marker appears and the `filament_ prefix` sub-count in Counts reflects it.
-- The base key is derived by stripping the `filament_` prefix, except for a small number of irregular keys (e.g. `activate_chamber_temp_control`, `idle_temperature`) which are listed in `filament_base_key_exceptions` in the config.
+- The base key is derived by stripping the `filament_` prefix.
 
 The full list of known override keys and their targets is maintained in `orcahunter_config.json`.
 
@@ -227,17 +227,6 @@ Groups `filament_` override keys by the section they target. This is how `orcahu
 Keys listed under `"machine"` override machine settings — filament wins over machine but loses to process. Keys listed under `"process"` override process settings — filament wins over process and is the highest priority for that setting.
 
 Keys beginning with `_` are treated as comments and ignored.
-
-### `filament_base_key_exceptions`
-
-For the small number of filament override keys whose base key cannot be derived by simply stripping the `filament_` prefix, an explicit mapping is provided here:
-
-```json
-"filament_base_key_exceptions": {
-    "activate_chamber_temp_control": "activate_chamber_temp_control",
-    "idle_temperature":              "idle_temperature"
-}
-```
 
 ### Versioning
 
@@ -979,13 +968,7 @@ As OrcaSlicer adds new `filament_` override keys in future versions, add them to
 }
 ```
 
-The base key is derived automatically by stripping the `filament_` prefix. If the key does not follow that pattern, add an explicit mapping to `filament_base_key_exceptions`:
-
-```json
-"filament_base_key_exceptions": {
-    "irregular_filament_key": "its_base_key"
-}
-```
+The base key is derived automatically by stripping the `filament_` prefix.
 
 ### Adding new meta keys
 
